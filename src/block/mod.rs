@@ -1,9 +1,10 @@
 extern crate crypto;
+extern crate derive_new;
 
 use self::crypto::digest::Digest;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, new)]
 pub struct Block {
     index: usize,
     previous_hash: String,
@@ -13,16 +14,6 @@ pub struct Block {
 }
 
 impl Block {
-    fn new(index: usize, prev: String, now: u128, data: String, nonce: i64) -> Block {
-        Block {
-            index: index,
-            previous_hash: prev,
-            timestamp: now,
-            data: data,
-            nonce: nonce,
-        }
-    }
-
     fn new_genesis(time: u128, data: String) -> Block {
         Self::new(0, String::from(""), time, data, 0)
     }

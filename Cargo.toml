@@ -5,3 +5,4 @@ authors = ["Alex Parella <aaparella@gmail.com>"]
 
 [dependencies]
 rust-crypto = "0.2.36"
+derive-new = "0.5.6"
