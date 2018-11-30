@@ -1,0 +1,7 @@
+[package]
+name = "fleetwood"
+version = "0.1.0"
+authors = ["Alex Parella <aaparella@gmail.com>"]
+
+[dependencies]
+rust-crypto = "0.2.36"
