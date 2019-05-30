@@ -11,11 +11,12 @@ pub struct Block {
     timestamp: u128,
     data: String,
     nonce: i64,
+    pub difficulty: usize,
 }
 
 impl Block {
-    fn new_genesis(time: u128, data: String) -> Block {
-        Self::new(0, String::from(""), time, data, 0)
+    fn new_genesis(time: u128, data: String, difficulty: usize) -> Block {
+        Self::new(0, String::from(""), time, data, 0, difficulty)
     }
 
     fn with_nonce(mut self, nonce: i64) -> Block {
@@ -39,11 +40,6 @@ pub struct BlockChain {
 }
 
 impl BlockChain {
-    // We'll need to extract this out to allow for the difficulty to change over
-    // time dynamically, but for now because this will literally never see the
-    // light of day, who cares?
-    const PREFIX: &'static str = "00";
-
     pub fn new() -> BlockChain {
         BlockChain { blocks: vec![] }
     }
@@ -54,23 +50,51 @@ impl BlockChain {
             .expect("Time is before the unix epoch?")
             .as_millis();
         let new_block = match self.blocks.len() {
-            0 => Block::new_genesis(now, data),
+            0 => Block::new_genesis(now, data, 2),
             n => {
                 let prev = self.blocks.get(n - 1).unwrap();
-                self.mine(n, data, prev.hash(), now)
+                let difficulty = self.current_difficulty();
+                self.mine(n, data, prev.hash(), now, difficulty)
             }
         };
         self.blocks.push(new_block);
     }
 
-    fn mine(&self, ind: usize, data: String, prev: String, now: u128) -> Block {
+    fn mine(&self, ind: usize, data: String, prev: String, now: u128, difficulty: usize) -> Block {
         let mut nonce = 0;
-        let mut new = Block::new(ind, prev, now, data, nonce);
-        while !new.hash().starts_with(Self::PREFIX) {
+        let mut new = Block::new(ind, prev, now, data, nonce, difficulty);
+        let prefix = "0".repeat(difficulty);
+        while !new.hash().starts_with(&prefix) {
             nonce = nonce + 1;
             new = new.with_nonce(nonce);
         }
         new
+    }
+
+    fn current_difficulty(&self) -> usize {
+        let last_block = &self.blocks[self.blocks.len() - 1];
+        // We only want to update the difficulty every ten blocks, as opposed
+        // to every single block.
+        if last_block.index % 10 == 0 && last_block.index != 0 {
+            let last_adjustment_block = &self.blocks[last_block.index - 10];
+            let time_passed = last_block.timestamp - last_adjustment_block.timestamp;
+            let time_expected = 50;
+            if time_passed < (time_expected / 2) {
+                last_block.difficulty + 1
+            } else if time_passed > time_expected * 2 {
+                last_block.difficulty - 1
+            } else {
+                last_block.difficulty
+            }
+        } else {
+            last_block.difficulty
+        }
+    }
+
+    pub fn difficulty(&self) -> u64 {
+        self.blocks
+            .iter()
+            .fold(0, |a, b| a + ((b.difficulty * b.difficulty) as u64))
     }
 
     // Checks that the current chain is actual valid, i.e all block hashes and
@@ -89,9 +113,11 @@ impl BlockChain {
                 let prev = &self.blocks[ind - 1];
                 let curr = &self.blocks[ind];
 
+                let prefix = "0".repeat(curr.difficulty);
+
                 if prev.hash() != curr.previous_hash
                     || curr.index != ind
-                    || !curr.hash().starts_with(Self::PREFIX)
+                    || !curr.hash().starts_with(&prefix)
                 {
                     return false;
                 }
